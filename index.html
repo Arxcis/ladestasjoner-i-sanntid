@@ -1,0 +1,241 @@
+<!DOCTYPE html5>
+<html>
+<head>
+    <meta charset="utf-8">
+
+    <style>
+        td span.unknown, td span.available, td span.occupied, td span.error {
+            border-radius: 2px;
+            padding: 5px 5px 2px 5px;
+            color: white;
+            min-width: 16px;
+            display: inline-block;
+            text-align: center;
+        }
+        span.unknown {
+            background-color: #a1887f;
+        }
+        span.available {
+            background-color: #81c784;
+        }
+        span.occupied {
+            background-color: #e57373;
+        }
+        span.error {
+            background-color: #ffd54f;
+        }
+
+        table {
+            position: relative;
+            text-align: left;
+        }
+        thead {
+            position: sticky;
+            top: 0;
+            background: white;
+        }
+        tr > th {
+            background-color: red;
+            color: white;
+        }
+        th, td {
+            padding: 2px 12px;
+            white-space: nowrap;
+        }
+
+    </style>
+</head>
+<body>
+    <table>
+    </table>
+</body>
+<script>
+    // Create WebSocket connection.
+    const API_KEY = "924fb7a29fc7ba631a12d0fd323409c2";
+    const socket = new WebSocket(`ws://realtime.nobil.no/api/v1/stream?apikey=${API_KEY}`);
+
+    // Connection opened
+    socket.addEventListener('open', (event) => {
+        socket.send('Hello Server!');
+    });
+
+    // Listen for messages
+    socket.addEventListener('message', OnMessage);
+
+    const chargerStationsMap = new Map();
+
+    async function OnMessage(event) {
+        const message = JSON.parse(event.data);
+
+        switch (message?.type) { 
+            case  "status:update": {
+                const { type, data: { uuid }}= message
+
+                const updatedChargerStation = await getUpdatedChargerStation(uuid);
+                chargerStationsMap.set(uuid, updatedChargerStation)
+            
+                render();
+
+            } break;
+            case "snapshot:init": {
+                const { type, data: chargerStations } = message;
+
+                const liveChargerStations = chargerStations.filter(({connectors}) => connectors.some(({status}) => status !== -1))
+
+                for (const { uuid, connectors } of liveChargerStations) {
+                    const timestamp = Math.max(...connectors.map(({timestamp}) => timestamp).filter(t => t !== -1));
+                    chargerStationsMap.set(uuid, { uuid, connectors, timestamp })
+                }
+                render();
+            } break;
+            default: {
+                console.error(`unknown message?.type: "`, {event, message})
+            }
+        }
+    }
+
+
+    async function OnClick(uuid) {
+        const chargerStation = await getUpdatedChargerStation(uuid);
+        chargerStationsMap.set(uuid, chargerStation)
+        render();
+    }
+
+    function render() {
+        const table = document.querySelector("table");
+        const chargerStations = [...chargerStationsMap.values()]
+        
+        const sortedChargerStations = chargerStations.sort((a, b) => b.timestamp - a.timestamp);
+
+
+        table.innerHTML = `
+
+<thead>
+    <tr>
+        <th>uuid</th>
+        <th>get</th>
+        <th>last updated</th>
+        <th>connectors</th>
+    </tr>
+</thead>
+
+<tbody>
+
+
+<tr>
+
+${sortedChargerStations.map(({uuid, connectors, timestamp, x, y, name }) => `
+
+    <td>${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : uuid}</td>
+    <td><button onclick="OnClick('${uuid}')">get</button></td>
+    <td>${!isNaN(timestamp) ? makeDatetimeString(timestamp): ""}</td>
+    <td>${connectors.map(({ status, power }) => makeStatusSpan(status, power, "kw")).join(" ")}</td>
+`)
+.join("</tr><tr>")}
+
+</tr>
+
+
+</tbody>
+`;
+
+    }
+
+async function getUpdatedChargerStation(uuid) {
+    const res = await fetch(`http://localhost:3000/charger-station/${uuid}`);
+    const json = await res.json();
+    
+    const { Provider, Rights, apiver, chargerstations } = json;
+    const [chargerstation,] = chargerstations;
+    const { csmd, attr } = chargerstation;
+
+    const { name, Position, Updated } = csmd;
+
+    // 1. Parse position:
+    let [y, x] = Position.replace(")", "").replace("(", "").split(",")
+
+    // 2. Parse timestamp:
+    const timestamp = new Date(Updated);
+
+
+    // 3. Parse connector status:
+    const connectors = Object.values(attr.conn)
+        .map(attributes => Object.values(attributes))
+        .map(attributes => {
+            const attrStatus = attributes.find(({attrname}) => attrname === "Connector status")?.attrval ?? "-1";
+            const attrCapacity = attributes.find(({attrname}) => attrname === "Charging capacity")?.attrvalid ?? "0";
+
+            return { 
+                status: parseInt(attrStatus),
+                power: mapCapacityIdToKiloWatt(parseInt(attrCapacity))
+            };
+        }).sort((a,b) => b.power - a.power);
+
+    console.log(connectors);
+
+    return { uuid, timestamp, name, x, y, connectors };
+}
+
+function makeStatusSpan(status, count) {
+    switch (status) {
+        case -1: return `<span title="unknown" class="unknown">${count !== undefined ? count : "❔"}</span>`;
+        case 0: return `<span title="${count}kw available" class="available">${count !== undefined ? count : "🟩"}</span>`;
+        case 1: return `<span title="${count}kw occupied" class="occupied">${count !== undefined ? count : "🚗"}</span>`;
+        case 2: return `<span title="error" class="error">${count !== undefined ? count : status}</span>`;
+    }
+}
+
+function makeDatetimeString(timestamp) {
+    return (new Date(timestamp))
+        .toLocaleString("no-NB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"});
+} 
+
+/**
+ * 
+ * 
+ * attrval  trans
+ * 0	    Unspecified
+ * 7	    3 - 230V 1-phase max 16A		
+ * 8	    7 - 230V 1-phase max 32A		
+ * 10	    11 - 400V 3-phase max 16A		
+ * 11	    22 - 400V 3-phase max 32A		
+ * 12	    43 - 400V 3-phase max 63A		
+ * 13	    50 - 500VDC max 100A		
+ * 29	    75 DC		
+ * 23	    100 - 500VDC max 200A		
+ * 22	    135 - 480VDC max 270A		
+ * 24	    150 DC		
+ * 32	    200 DC		
+ * 30	    225 DC		
+ * 31	    250 DC		
+ * 33	    300 DC		
+ * 25	    350 DC		
+ * 16	    230V 3-phase max 16A		
+ * 17	    230V 3-phase max 32A		
+ * 18	    230V 3-phase max 63A		
+ * 19	    20 kW - 500VDC max 50A		
+ * 26	    350 bar		
+ * 27	    700 bar
+*/
+function mapCapacityIdToKiloWatt(capacityId) {
+    switch (capacityId) {
+        case 7: return 3;
+        case 8: return 7;
+        case 10: return 11;
+        case 11: return 22;
+        case 12: return 43;
+        case 13: return 50;
+        case 29: return 75;
+        case 23: return 100;
+        case 22: return 135;
+        case 24: return 150;
+        case 32: return 200;
+        case 31: return 250;
+        case 33: return 300;
+        case 25: return 350;
+        default: return 0;
+    }
+}
+
+</script>
+</html>
