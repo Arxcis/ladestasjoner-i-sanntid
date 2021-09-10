@@ -81,7 +81,7 @@
         }
 
         tr.total-row {
-            font-size: 18px;
+            font-size: 17px;
         }
 
     </style>
@@ -328,7 +328,7 @@ function render() {
             <tr>
                 <th>uuid</th>
                 <th>charger station name</th>
-                <th>last updated</th>
+                <th>last update</th>
                 <th>load %</th>
                 <th>connectors kW</th>
             </tr>
@@ -337,7 +337,7 @@ function render() {
             <tr class="total-row">
                 <td><b>----</b></td>
                 <td><b>Norway</b></td>
-                <td><b>----</b></td>
+                <td><b>${makeDatetimeString(Date.now())}</b></td>
                 <td class="sum"><b>${loadPercent}</b></td>
                 <td>${makeStatusSpan(1, occupiedKW)} ${makeStatusSpan(0, availableKW)}</td>
             </tr>
