@@ -106,7 +106,6 @@
         const message = JSON.parse(event.data);
 
         async function update(dynamicChargerStation) {
-
             // @bugfix - unix timestamp is not really a unix timestamp but a Europe/Oslo-timestamp disguised as unix timestamp 
             dynamicChargerStation.connectors = dynamicChargerStation.connectors.map(({ uuid, status, timestamp }) => {
                 return {
@@ -126,7 +125,7 @@
         switch (message?.type) { 
             case  "status:update": {
                 const { type, data: dynamicChargerStation } = message
-                update(dynamicChargerStation)
+                await update(dynamicChargerStation)
             } break;
             case "snapshot:init": {
                 const { type, data: chargerStations } = message;
@@ -134,7 +133,7 @@
                 const dynamicChargerStations = chargerStations.filter(({connectors}) => connectors.some(({status}) => status !== -1))
 
                 for (const dynamicChargerStation of dynamicChargerStations) {
-                    update(dynamicChargerStation)
+                    await update(dynamicChargerStation)
                 }
             } break;
             default: {
