@@ -334,7 +334,7 @@ function render() {
                         <td>${uuid}</td>
                         <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
                         <td>${makeDatetimeString(getTimeStampFromConnectors(connectors))}</td>
-                        <td class="sum">${usagePercent ? usagePercent : "?"}</td>
+                        <td class="sum">${(!isNaN(usagePercent))  ? usagePercent : "?"}</td>
                         <td>${connectors.map(({ status, power }) => makeStatusSpan(status === -1 ? 0 : status, power)).join(" ")}</td>
                     `;
                 })
