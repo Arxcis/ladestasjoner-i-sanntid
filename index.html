@@ -284,16 +284,11 @@ function render() {
             const occua = sumOccupiedPower(a.connectors);
             const availb = sumAvailablePower(b.connectors)
             const availa = sumAvailablePower(a.connectors);
-            const usagea = Math.round(100 * (occub / (occub + availb)));
-            const usageb = Math.round(100 * (occua / (occua + availa)));
 
-            if (usagea === usageb && occub === occua) {
-                return getTimeStampFromConnectors(b.connectors) - getTimeStampFromConnectors(a.connectors);
-            } else if (usagea === usageb) {
-                return occub - occua
-            } else {
-                return usagea - usageb;
-            }
+            const totala = occua + availa;
+            const totalb = occub + availb;
+
+            return totalb - totala;
         });
 
     // Update kw occupied vs kw available
