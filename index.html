@@ -105,15 +105,28 @@
     async function OnMessage(event) {
         const message = JSON.parse(event.data);
 
+        async function update(dynamicChargerStation) {
+
+            // @bugfix - unix timestamp is not really a unix timestamp but a Europe/Oslo-timestamp disguised as unix timestamp 
+            dynamicChargerStation.connectors = dynamicChargerStation.connectors.map(({ uuid, status, timestamp }) => {
+                return {
+                    uuid,
+                    status,
+                    timestamp: timestamp - ((new Date()).getTimezoneOffset() * 60000)
+                }
+            }) 
+            // @bugfix end
+
+            const staticChargerStation = await getStaticChargerStation(dynamicChargerStation.uuid);
+            const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
+            chargerStationsMap.set(chargerStation.uuid, chargerStation)
+            render();
+        }
+
         switch (message?.type) { 
             case  "status:update": {
                 const { type, data: dynamicChargerStation } = message
-
-                const staticChargerStation = await getStaticChargerStation(dynamicChargerStation.uuid);
-                const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
-                chargerStationsMap.set(chargerStation.uuid, chargerStation)
-                render();
-
+                update(dynamicChargerStation)
             } break;
             case "snapshot:init": {
                 const { type, data: chargerStations } = message;
@@ -121,10 +134,7 @@
                 const dynamicChargerStations = chargerStations.filter(({connectors}) => connectors.some(({status}) => status !== -1))
 
                 for (const dynamicChargerStation of dynamicChargerStations) {
-                    const staticChargerStation = await getStaticChargerStation(dynamicChargerStation.uuid);
-                    const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
-                    chargerStationsMap.set(chargerStation.uuid, chargerStation)
-                    render();
+                    update(dynamicChargerStation)
                 }
             } break;
             default: {
