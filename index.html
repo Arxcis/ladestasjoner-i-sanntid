@@ -111,24 +111,21 @@
 
                 const staticChargerStation = await getStaticChargerStation(dynamicChargerStation.uuid);
                 const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
-
                 chargerStationsMap.set(chargerStation.uuid, chargerStation)
-            
                 render();
 
             } break;
             case "snapshot:init": {
                 const { type, data: chargerStations } = message;
 
-                const liveChargerStations = chargerStations.filter(({connectors}) => connectors.some(({status}) => status !== -1))
+                const dynamicChargerStations = chargerStations.filter(({connectors}) => connectors.some(({status}) => status !== -1))
 
-                for (const dynamicChargerStation of liveChargerStations) {
+                for (const dynamicChargerStation of dynamicChargerStations) {
                     const staticChargerStation = await getStaticChargerStation(dynamicChargerStation.uuid);
                     const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
-
                     chargerStationsMap.set(chargerStation.uuid, chargerStation)
+                    render();
                 }
-                render();
             } break;
             default: {
                 console.error(`unknown message?.type: "`, {event, message})
@@ -266,10 +263,10 @@ function render() {
     
 
     function sumAvailablePower(connectors) {
-        return connectors.reduce((sum, connector) => sum + (connector.power * (connector.status !== 1)), 0);
+        return connectors?.reduce((sum, connector) => sum + (connector.power * (connector.status !== 1)), 0) ?? 0;
     }
     function sumOccupiedPower(connectors) {
-        return connectors.reduce((sum, connector) => sum + (connector.power * (connector.status === 1)), 0);
+        return connectors?.reduce((sum, connector) => sum + (connector.power * (connector.status === 1)), 0) ?? 0;
     }
 
     const sortedChargerStations = chargerStations
@@ -337,7 +334,7 @@ function render() {
                         <td>${uuid}</td>
                         <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
                         <td>${makeDatetimeString(getTimeStampFromConnectors(connectors))}</td>
-                        <td class="sum">${usagePercent}</td>
+                        <td class="sum">${usagePercent ? usagePercent : "?"}</td>
                         <td>${connectors.map(({ status, power }) => makeStatusSpan(status === -1 ? 0 : status, power)).join(" ")}</td>
                     `;
                 })
