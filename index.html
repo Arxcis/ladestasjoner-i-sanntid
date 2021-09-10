@@ -61,6 +61,10 @@
             text-overflow: ellipsis;
         }
 
+        td.sum {
+            text-align: right;
+        }
+
     </style>
 </head>
 <body>
@@ -70,9 +74,12 @@
     </table>
 </body>
 <script>
+    const HOST = "localhost:3000";
+    const HTTP_HOST = `http://${HOST}`;
+    const WS_HOST = `ws://${HOST}`;
+
     // Create WebSocket connection.
-    const API_KEY = "924fb7a29fc7ba631a12d0fd323409c2";
-    const socket = new WebSocket(`ws://realtime.nobil.no/api/v1/stream?apikey=${API_KEY}`);
+    const socket = new WebSocket(WS_HOST);
 
     // Connection opened
     socket.addEventListener('open', (event) => {
@@ -164,7 +171,7 @@ async function getStaticChargerStation(uuid) {
     } catch(err) {
     }
 
-    const res = await fetch(`http://localhost:3000/charger-station/${uuid}`);
+    const res = await fetch(`${HTTP_HOST}/charger-station/${uuid}`);
     const json = await res.json();
     
     const { Provider, Rights, apiver, chargerstations } = json;
@@ -254,32 +261,33 @@ function mapCapacityIdToKiloWatt(capacityId) {
     }
 }
 
-async function OnClick(uuid) {
-    const dynamicChargerStation = chargerStationsMap.get(uuid);
-    const staticChargerStation = await getStaticChargerStation(uuid);
-
-    console.log({dynamicChargerStation, staticChargerStation})
-    const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
-    chargerStationsMap.set(uuid, chargerStation);
-}
-
 function render() {
     const table = document.querySelector("table");
     const chargerStations = [...chargerStationsMap.values()]
     
 
+    function sumAvailablePower(connectors) {
+        return connectors.reduce((sum, connector) => sum + (connector.power * (connector.status !== 1)), 0);
+    }
     function sumOccupiedPower(connectors) {
         return connectors.reduce((sum, connector) => sum + (connector.power * (connector.status === 1)), 0);
     }
 
     const sortedChargerStations = chargerStations
         .sort((a, b) => {
-            const sumb = sumOccupiedPower(b.connectors)
-            const suma = sumOccupiedPower(a.connectors);
-            if (sumb === suma) {
-                return getTimeStampFromConnectors(b.connectors) - getTimeStampFromConnectors(a.connectors)
+            const occub = sumOccupiedPower(b.connectors)
+            const occua = sumOccupiedPower(a.connectors);
+            const availb = sumAvailablePower(b.connectors)
+            const availa = sumAvailablePower(a.connectors);
+            const usagea = Math.round(100 * (occub / (occub + availb)));
+            const usageb = Math.round(100 * (occua / (occua + availa)));
+
+            if (usagea === usageb && occub === occua) {
+                return getTimeStampFromConnectors(b.connectors) - getTimeStampFromConnectors(a.connectors);
+            } else if (usagea === usageb) {
+                return occub - occua
             } else {
-                return sumb - suma;
+                return usagea - usageb;
             }
         });
 
@@ -292,12 +300,14 @@ function render() {
             0), 
         0);
     
-    const allKW = values
+    const notOccupiedKW = values
         .reduce(
             (sum, station) => sum + station.connectors.reduce(
-                (sum, connector) => sum + connector.power, 
+                (sum, connector) => sum + connector.power * (connector.status !== 1), 
             0), 
         0);
+
+    const usagePercent = Math.round(100 * (occupiedKW / (occupiedKW + notOccupiedKW)));
 
     table.innerHTML = `
         <thead>
@@ -305,26 +315,33 @@ function render() {
                 <th>uuid</th>
                 <th>charger station name</th>
                 <th>last updated</th>
-                <th>station kw</th>
-                <th>connectors kw</th>
+                <th>occupied %</th>
+                <th>connectors kW</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>----</td>
+                <td><b>----</b></td>
                 <td><b>Norway</b></td>
-                <td>----</td>
-                <td>${makeStatusSpan(1, occupiedKW)} / ${makeStatusSpan(0, allKW)}</td>
+                <td><b>----</b></td>
+                <td class="sum"><b>${usagePercent}</b></td>
                 <td></td>
             </tr>
             <tr>
-                ${sortedChargerStations.map(({uuid, connectors, timestamp, x, y, name }) => `
-                    <td>${uuid}</td>
-                    <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
-                    <td>${makeDatetimeString(getTimeStampFromConnectors(connectors))}</td>
-                    <td>${makeStatusSpan(1, sumOccupiedPower(connectors))} / ${makeStatusSpan(0, connectors.reduce((sum, connector) => sum + connector.power, 0))}</td>
-                    <td>${connectors.map(({ status, power }) => makeStatusSpan(status, power)).join(" ")}</td>
-                `)
+                ${sortedChargerStations.map(({uuid, connectors, timestamp, x, y, name }) => {
+                    
+                    const occupiedKW = sumOccupiedPower(connectors);
+                    const availableKW = sumAvailablePower(connectors);
+                    const usagePercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)))
+
+                    return `
+                        <td>${uuid}</td>
+                        <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
+                        <td>${makeDatetimeString(getTimeStampFromConnectors(connectors))}</td>
+                        <td class="sum">${usagePercent}</td>
+                        <td>${connectors.map(({ status, power }) => makeStatusSpan(status === -1 ? 0 : status, power)).join(" ")}</td>
+                    `;
+                })
                 .join("</tr><tr>")}
             </tr>
         </tbody>
@@ -333,10 +350,10 @@ function render() {
 
 function makeStatusSpan(status, power) {
     switch (status) {
-        case -1: return `<span title="${power}kw unknown" class="available">${power !== undefined ? power : "❔"}</span>`;
-        case 0: return `<span title="${power}kw available" class="available">${power !== undefined ? power : "❔"}</span>`;
-        case 1: return `<span title="${power}kw occupied" class="occupied">${power !== undefined ? power : "❔"}</span>`;
-        case 2: return `<span title="${power}kw error" class="error">${power !== undefined ? power : "❔"}</span>`;
+        case -1: return `<span class="unknown">${power !== undefined ? power : "❔"}</span>`;
+        case 0: return `<span class="available">${power !== undefined ? power : "❔"}</span>`;
+        case 1: return `<span class="occupied">${power !== undefined ? power : "❔"}</span>`;
+        case 2: return `<span class="error">${power !== undefined ? power : "❔"}</span>`;
     }
 }
 

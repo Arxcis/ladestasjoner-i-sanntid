@@ -1,17 +1,28 @@
 import express from "express";
 import fetch from "node-fetch"
+import http from "http";
+import httpProxy from "http-proxy";
 
+const API_KEY = "924fb7a29fc7ba631a12d0fd323409c2";
+
+// Create server
+// @see inspired by https://gist.github.com/hhanh00/ddf3bf62294fc420a0de
 const app = express();
+const proxy = httpProxy.createProxyServer({ 
+    target: `ws://realtime.nobil.no/`, 
+    ws: true,
 
+});
+const server = http.createServer(app);
+
+// Add response header middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   next();
 });
 
-const cache = new Set();
-
+// Proxy GET charger station
 app.get('/charger-station/:uuid', async (req, res) => {
-    const API_KEY = "924fb7a29fc7ba631a12d0fd323409c2";
     const { params: { uuid }} = req;
 
     const body = JSON.stringify({
@@ -34,5 +45,14 @@ app.get('/charger-station/:uuid', async (req, res) => {
     res.json(json)
 });
 
+// Proxy websockets
+server.on('upgrade', function (req, socket, head) {
+    req.url = `${req.url}api/v1/stream?apikey=${API_KEY}`;
+
+    console.info("proxying websocket upgrade request", req.url);
+
+    proxy.ws(req, socket, head);
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`listening on ${PORT}`));
+server.listen(PORT, () => console.log(`listening on ${PORT}`));
