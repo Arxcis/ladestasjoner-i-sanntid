@@ -305,14 +305,14 @@ function render() {
             0), 
         0);
     
-    const notOccupiedKW = values
+    const availableKW = values
         .reduce(
             (sum, station) => sum + station.connectors.reduce(
                 (sum, connector) => sum + connector.power * (connector.status !== 1), 
             0), 
         0);
 
-    const usagePercent = Math.round(100 * (occupiedKW / (occupiedKW + notOccupiedKW)));
+    const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)));
 
     table.innerHTML = `
         <thead>
@@ -329,21 +329,20 @@ function render() {
                 <td><b>----</b></td>
                 <td><b>Norway</b></td>
                 <td><b>----</b></td>
-                <td class="sum"><b>${usagePercent}</b></td>
-                <td></td>
+                <td class="sum"><b>${loadPercent}</b></td>
+                <td>${makeStatusSpan(1, occupiedKW)} ${makeStatusSpan(0, availableKW)}</td>
             </tr>
             <tr>
                 ${sortedChargerStations.map(({uuid, connectors, timestamp, x, y, name }) => {
-                    
                     const occupiedKW = sumOccupiedPower(connectors);
                     const availableKW = sumAvailablePower(connectors);
-                    const usagePercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)))
+                    const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)))
 
                     return `
                         <td>${uuid}</td>
                         <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
                         <td>${makeDatetimeString(getTimeStampFromConnectors(connectors))}</td>
-                        <td class="sum">${(!isNaN(usagePercent))  ? usagePercent : "?"}</td>
+                        <td class="sum">${(!isNaN(loadPercent))  ? loadPercent : "?"}</td>
                         <td>${connectors.map(({ status, power }) => makeStatusSpan(status === -1 ? 0 : status, power)).join(" ")}</td>
                     `;
                 })
