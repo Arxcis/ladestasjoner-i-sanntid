@@ -4,13 +4,23 @@
     <meta charset="utf-8">
 
     <style>
-        header {
+        body {
+            margin: 0;
+            font-family: Helvetica, Arial, Sans-Serif;
+        }
+        header, footer {
             display: flex;
             justify-content: center;
             height: 30px;
             align-items: center;
             padding: 25px 0 20px 0;
             background-color: rgb(237, 237, 237);
+        }
+
+        footer {
+            display: flex;
+            flex-direction: column;
+            font-size: 12px;
         }
 
         span.unknown, span.available, span.occupied, span.error {
@@ -47,7 +57,7 @@
             background-color: rgb(237, 237, 237);
         }
         tr > th {
-            background-color: red;
+            background-color: #7b7b7b;
             color: white;
         }
         th, td {
@@ -68,10 +78,14 @@
     </style>
 </head>
 <body>
-    <header ></header>
-
+    <header><h2>Ladestasjoner i sanntid</h2></header>
     <table>
     </table>
+    <footer>
+        <section>Data provided by <a href="https://github.com/nobil/nobil-stream-api" target="_blank">nobil-stream-api</a> and <a href="https://info.nobil.no/" target="_blank">nobil.no</a></section>
+        <section><a href="https://github.com/Arxcis/ladestasjoner-i-sanntid/">https://github.com/Arxcis/ladestasjoner-i-sanntid</a></section> 
+        <section>jonasjso@protonmail.com</section> 
+    </footer>
 </body>
 <script>
     const HOST = "boiling-cliffs-78163.herokuapp.com";
@@ -80,28 +94,13 @@
 
     // Create WebSocket connection.
     const socket = new WebSocket(WS_HOST);
-
-    // Connection opened
     socket.addEventListener('open', (event) => {
         socket.send('Hello Server!');
     });
-
-    // Listen for messages
     socket.addEventListener('message', OnMessage);
 
+    // Listen for messages
     const chargerStationsMap = new Map();
-
-    function updateHeader() {
-        // Update header clock
-        const clock = document.querySelector("header")
-        const date = new Date();
-
-        // Render
-        clock.innerHTML = `LIVE ${makeDatetimeString(date, {second: "2-digit"})} -- Data provided by <a href="https://github.com/nobil/nobil-stream-api" target="_blank">nobil-stream-api</a> and <a href="https://info.nobil.no/" target="_blank">nobil.no</a>`;
-
-        window.requestAnimationFrame(updateHeader)
-    }
-    window.requestAnimationFrame(updateHeader);
 
     async function OnMessage(event) {
         const message = JSON.parse(event.data);
@@ -315,8 +314,8 @@ function render() {
                 <th>uuid</th>
                 <th>charger station name</th>
                 <th>last updated</th>
-                <th>occupied %</th>
-                <th>connectors kW</th>
+                <th>power %</th>
+                <th>connectors power kW</th>
             </tr>
         </thead>
         <tbody>
@@ -356,7 +355,6 @@ function makeStatusSpan(status, power) {
         case 2: return `<span class="error">${power !== undefined ? power : "❔"}</span>`;
     }
 }
-
 
 </script>
 </html>
