@@ -78,7 +78,7 @@
     </style>
 </head>
 <body>
-    <header><h2>Ladestasjoner i sanntid</h2></header>
+    <header><h2>🔌 Norske ladestasjoner med sanntidsdata 🔋</h2></header>
     <table>
     </table>
     <footer>
@@ -115,7 +115,6 @@
                 }
             }) 
             // @bugfix end
-
             const staticChargerStation = await getStaticChargerStation(dynamicChargerStation.uuid);
             const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
             chargerStationsMap.set(chargerStation.uuid, chargerStation)
@@ -124,16 +123,16 @@
 
         switch (message?.type) { 
             case  "status:update": {
-                const { type, data: dynamicChargerStation } = message
-                await update(dynamicChargerStation)
+                const { type, data: station } = message
+                await update(station)
             } break;
             case "snapshot:init": {
                 const { type, data: chargerStations } = message;
 
-                const dynamicChargerStations = chargerStations.filter(({connectors}) => connectors.some(({status}) => status !== -1))
+                const norwegianChargerStations = chargerStations.filter(({uuid}) => uuid.includes("NOR_"))
 
-                for (const dynamicChargerStation of dynamicChargerStations) {
-                    await update(dynamicChargerStation)
+                for (const station of norwegianChargerStations) {
+                    await update(station)
                 }
             } break;
             default: {
@@ -288,7 +287,11 @@ function render() {
             const totala = occua + availa;
             const totalb = occub + availb;
 
-            return totalb - totala;
+            if (totala !== totalb) {
+                return totalb - totala;
+            } else {
+                return a.name.localeCompare(b.name);
+            }
         });
 
     // Update kw occupied vs kw available
@@ -328,15 +331,17 @@ function render() {
                 <td>${makeStatusSpan(1, occupiedKW)} ${makeStatusSpan(0, availableKW)}</td>
             </tr>
             <tr>
-                ${sortedChargerStations.map(({uuid, connectors, timestamp, x, y, name }) => {
+                ${sortedChargerStations.map(({uuid, connectors, x, y, name }) => {
                     const occupiedKW = sumOccupiedPower(connectors);
                     const availableKW = sumAvailablePower(connectors);
                     const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)))
 
+                    const timestamp = getTimeStampFromConnectors(connectors);
+
                     return `
                         <td>${uuid}</td>
                         <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
-                        <td>${makeDatetimeString(getTimeStampFromConnectors(connectors))}</td>
+                        <td>${timestamp === 7199999 ? "----" : makeDatetimeString(timestamp)}</td>
                         <td class="sum">${(!isNaN(loadPercent))  ? loadPercent : "?"}</td>
                         <td>${connectors.map(({ status, power }) => makeStatusSpan(status === -1 ? 0 : status, power)).join(" ")}</td>
                     `;
