@@ -78,7 +78,7 @@
     </style>
 </head>
 <body>
-    <header><h2>🔌 Norske ladestasjoner med sanntidsdata 🔋</h2></header>
+    <header><h2>Norske ladestasjoner i sanntid 🔌</h2></header>
     <table>
     </table>
     <footer>
@@ -124,7 +124,9 @@
         switch (message?.type) { 
             case  "status:update": {
                 const { type, data: station } = message
-                await update(station)
+                if (station.uuid.includes("NOR_")) {
+                    await update(station)
+                }
             } break;
             case "snapshot:init": {
                 const { type, data: chargerStations } = message;
