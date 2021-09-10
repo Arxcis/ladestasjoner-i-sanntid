@@ -4,7 +4,7 @@
     <meta charset="utf-8">
 
     <style>
-        section.clock {
+        header {
             display: flex;
             justify-content: center;
         }
@@ -51,21 +51,12 @@
     </style>
 </head>
 <body>
-    <section class="clock"></section>
+    <header ></header>
 
     <table>
     </table>
 </body>
 <script>
-    function updateClock() {
-        const clock = document.querySelector("section.clock")
-        const date = new Date();
-        clock.innerHTML = makeDatetimeString(date, {second: "2-digit"});
-
-        window.requestAnimationFrame(updateClock)
-    }
-    window.requestAnimationFrame(updateClock);
-
     // Create WebSocket connection.
     const API_KEY = "924fb7a29fc7ba631a12d0fd323409c2";
     const socket = new WebSocket(`ws://realtime.nobil.no/api/v1/stream?apikey=${API_KEY}`);
@@ -79,6 +70,34 @@
     socket.addEventListener('message', OnMessage);
 
     const chargerStationsMap = new Map();
+
+    function updateHeader() {
+        // Update header clock
+        const clock = document.querySelector("header")
+        const date = new Date();
+
+        // Update kw occupied vs kw available
+        const values = [...chargerStationsMap.values()];
+        const occupiedKW = values
+            .reduce(
+                (sum, station) => sum + station.connectors.reduce(
+                    (sum, connector) => sum + connector.power * (connector.status === 1), 
+                0), 
+            0);
+        
+        const allKW = values
+            .reduce(
+                (sum, station) => sum + station.connectors.reduce(
+                    (sum, connector) => sum + connector.power, 
+                0), 
+            0);
+
+        // Render
+        clock.innerHTML = `${occupiedKW} kW / ${allKW} kW - ${makeDatetimeString(date, {second: "2-digit"})}`;
+
+        window.requestAnimationFrame(updateHeader)
+    }
+    window.requestAnimationFrame(updateHeader);
 
     async function OnMessage(event) {
         const message = JSON.parse(event.data);
@@ -251,14 +270,27 @@ function render() {
     const table = document.querySelector("table");
     const chargerStations = [...chargerStationsMap.values()]
     
-    const sortedChargerStations = chargerStations.sort(
-        (a, b) => getTimeStampFromConnectors(b.connectors) - getTimeStampFromConnectors(a.connectors));
+
+    function sumOccupiedPower(connectors) {
+        return connectors.reduce((sum, connector) => sum + (connector.power * (connector.status === 1)), 0);
+    }
+
+    const sortedChargerStations = chargerStations
+        .sort((a, b) => {
+            const sumb = sumOccupiedPower(b.connectors)
+            const suma = sumOccupiedPower(a.connectors);
+            if (sumb === suma) {
+                return getTimeStampFromConnectors(b.connectors) - getTimeStampFromConnectors(a.connectors)
+            } else {
+                return sumb - suma;
+            }
+        });
 
     table.innerHTML = `
         <thead>
             <tr>
                 <th>uuid</th>
-                <th>name</th>
+                <th>charger station name</th>
                 <th>last updated</th>
                 <th>connectors</th>
             </tr>
@@ -279,10 +311,10 @@ function render() {
 
 function makeStatusSpan(status, power) {
     switch (status) {
-        case -1: return `<span title="unknown" class="unknown">${power !== undefined ? power : "❔"}</span>`;
+        case -1: return `<span title="${power}kw unknown" class="available">${power !== undefined ? power : "❔"}</span>`;
         case 0: return `<span title="${power}kw available" class="available">${power !== undefined ? power : "❔"}</span>`;
         case 1: return `<span title="${power}kw occupied" class="occupied">${power !== undefined ? power : "❔"}</span>`;
-        case 2: return `<span title="error" class="error">${power !== undefined ? power : status}</span>`;
+        case 2: return `<span title="${power}kw error" class="error">${power !== undefined ? power : "❔"}</span>`;
     }
 }
 
