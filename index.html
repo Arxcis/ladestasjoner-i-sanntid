@@ -330,7 +330,7 @@ function render() {
                 <th>charger station name</th>
                 <th>last update</th>
                 <th>load %</th>
-                <th>connectors kW</th>
+                <th>occupied kW / available kW</th>
             </tr>
         </thead>
         <tbody>
@@ -366,8 +366,8 @@ function render() {
 function makeStatusSpan(status, power) {
     switch (status) {
         case -1: return `<span class="unknown">${power !== undefined ? power : "❔"}</span>`;
-        case 0: return `<span class="available">${power !== undefined ? power : "❔"}</span>`;
-        case 1: return `<span class="occupied">${power !== undefined ? power : "❔"}</span>`;
+        case 0: return `<span title="${power} kW available" class="available">${power !== undefined ? power : "❔"}</span>`;
+        case 1: return `<span title="${power} kW occupied" class="occupied">${power !== undefined ? power : "❔"}</span>`;
         case 2: return `<span class="error">${power !== undefined ? power : "❔"}</span>`;
     }
 }
