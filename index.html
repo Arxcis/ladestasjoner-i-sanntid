@@ -7,9 +7,13 @@
         header {
             display: flex;
             justify-content: center;
+            height: 30px;
+            align-items: center;
+            padding: 25px 0 20px 0;
+            background-color: rgb(237, 237, 237);
         }
 
-        td span.unknown, td span.available, td span.occupied, td span.error {
+        span.unknown, span.available, span.occupied, span.error {
             border-radius: 2px;
             padding: 5px 5px 2px 5px;
             color: white;
@@ -39,6 +43,9 @@
             top: 0;
             background: white;
         }
+        tr:hover {
+            background-color: rgb(237, 237, 237);
+        }
         tr > th {
             background-color: red;
             color: white;
@@ -46,6 +53,12 @@
         th, td {
             padding: 2px 12px;
             white-space: nowrap;
+        }
+
+        td.name {
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
     </style>
@@ -76,24 +89,8 @@
         const clock = document.querySelector("header")
         const date = new Date();
 
-        // Update kw occupied vs kw available
-        const values = [...chargerStationsMap.values()];
-        const occupiedKW = values
-            .reduce(
-                (sum, station) => sum + station.connectors.reduce(
-                    (sum, connector) => sum + connector.power * (connector.status === 1), 
-                0), 
-            0);
-        
-        const allKW = values
-            .reduce(
-                (sum, station) => sum + station.connectors.reduce(
-                    (sum, connector) => sum + connector.power, 
-                0), 
-            0);
-
         // Render
-        clock.innerHTML = `${occupiedKW} kW / ${allKW} kW - ${makeDatetimeString(date, {second: "2-digit"})}`;
+        clock.innerHTML = `LIVE ${makeDatetimeString(date, {second: "2-digit"})} -- Data provided by <a href="https://github.com/nobil/nobil-stream-api" target="_blank">nobil-stream-api</a> and <a href="https://info.nobil.no/" target="_blank">nobil.no</a>`;
 
         window.requestAnimationFrame(updateHeader)
     }
@@ -286,21 +283,46 @@ function render() {
             }
         });
 
+    // Update kw occupied vs kw available
+    const values = [...chargerStationsMap.values()];
+    const occupiedKW = values
+        .reduce(
+            (sum, station) => sum + station.connectors.reduce(
+                (sum, connector) => sum + connector.power * (connector.status === 1), 
+            0), 
+        0);
+    
+    const allKW = values
+        .reduce(
+            (sum, station) => sum + station.connectors.reduce(
+                (sum, connector) => sum + connector.power, 
+            0), 
+        0);
+
     table.innerHTML = `
         <thead>
             <tr>
                 <th>uuid</th>
                 <th>charger station name</th>
                 <th>last updated</th>
-                <th>connectors</th>
+                <th>station kw</th>
+                <th>connectors kw</th>
             </tr>
         </thead>
         <tbody>
             <tr>
+                <td>----</td>
+                <td><b>Norway</b></td>
+                <td>----</td>
+                <td>${makeStatusSpan(1, occupiedKW)} / ${makeStatusSpan(0, allKW)}</td>
+                <td></td>
+            </tr>
+            <tr>
                 ${sortedChargerStations.map(({uuid, connectors, timestamp, x, y, name }) => `
                     <td>${uuid}</td>
-                    <td>${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
+                    <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
                     <td>${makeDatetimeString(getTimeStampFromConnectors(connectors))}</td>
+                    <td>${makeStatusSpan(1, sumOccupiedPower(connectors))} / ${makeStatusSpan(0, connectors.reduce((sum, connector) => sum + connector.power, 0))}</td>
                     <td>${connectors.map(({ status, power }) => makeStatusSpan(status, power)).join(" ")}</td>
                 `)
                 .join("</tr><tr>")}
