@@ -266,8 +266,6 @@ function render(table, chargerStations) {
             0), 
         0);
 
-    const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)));
-
     // 2. Sort
     chargerStations
         .sort((a, b) => {
@@ -292,7 +290,7 @@ function render(table, chargerStations) {
             <tr>
                 <th>ladestasjon</th>
                 <th>sist oppdatert</th>
-                <th>opptatt %</th>
+                <th>installert kW</th>
                 <th>status kW</th>
             </tr>
         </thead>
@@ -300,21 +298,20 @@ function render(table, chargerStations) {
             <tr>
                 <td><b>Norge</b></td>
                 <td><b>${makeDatetimeString(Date.now())}</b></td>
-                <td class="sum"><b>${loadPercent}</b></td>
+                <td class="sum"><b>${occupiedKW + availableKW}</b></td>
                 <td>${makeStatusSpan(1, occupiedKW)} ${makeStatusSpan(0, availableKW)}</td>
             </tr>
             <tr>
                 ${chargerStations.map(({uuid, connectors, x, y, name }) => {
                     const occupiedKW = sumOccupiedPower(connectors);
                     const availableKW = sumAvailablePower(connectors);
-                    const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)))
 
                     const timestamp = getTimeStampFromConnectors(connectors);
 
                     return `
                         <td title="${name}" class="name">${name ? `<a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${y},${x}">${name}</a>` : ""}</td>
                         <td>${timestamp === 7199999 ? "----" : makeDatetimeString(timestamp)}</td>
-                        <td class="sum">${(!isNaN(loadPercent))  ? loadPercent : "?"}</td>
+                        <td class="sum">${occupiedKW + availableKW}</td>
                         <td>${connectors.map(({ status, power }) => makeStatusSpan(status === -1 ? 0 : status, power)).join(" ")}</td>
                     `;
                 })
