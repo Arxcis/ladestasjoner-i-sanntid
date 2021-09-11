@@ -303,8 +303,8 @@ function render(table, chargerStations) {
                 <td><b>${makeDatetimeString(Date.now())}</b></td>
                 <td class="sum"><b>${installedKW}</b></td>
                 <td class="status">
-                    <span class="occupied" style="width: ${occupiedPromille * .85}px;" title="${occupiedKW} kW occupied">${Math.round(occupiedKW / 100) / 10}k</span>
-                    <span class="available" style="width: ${availablePromille * .85}px;" title="${availableKW} kW available">${Math.round(availableKW / 100) / 10}k</span>
+                    <span class="occupied" style="min-width: ${occupiedPromille * .85}px;" title="${occupiedKW} kW occupied">${occupiedKW}</span>
+                    <span class="available" style="min-width: ${availablePromille * .85}px;" title="${availableKW} kW available">${availableKW}</span>
                 </td>
             </tr>
             <tr>
