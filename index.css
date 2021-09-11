@@ -1,0 +1,79 @@
+body {
+    margin: 0;
+    font-family: Helvetica, Arial, Sans-Serif;
+}
+
+header {
+    height: 15px;
+    display: flex;
+    padding: 20px 0 20px 20px;
+    background-color: rgb(237, 237, 237);
+    align-items: center;
+}
+
+header > img {
+    margin: 0 10px 0 0;
+}
+
+footer {
+    padding: 30px 0 20px 0;
+    height: 50px;
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    align-items: center;
+    color: #dfdfdf;
+    background-color: #4d4d4d;
+}
+
+span.unknown, span.available, span.occupied, span.error {
+    border-radius: 2px;
+    padding: 5px 5px 2px 5px;
+    color: white;
+    min-width: 16px;
+    display: inline-block;
+    text-align: center;
+}
+span.unknown {
+    background-color: #a1887f;
+}
+span.available {
+    background-color: #81c784;
+}
+span.occupied {
+    background-color: #e57373;
+}
+span.error {
+    background-color: #ffd54f;
+}
+
+table {
+    position: relative;
+    text-align: left;
+}
+thead {
+    position: sticky;
+    top: 0;
+    background: white;
+}
+tr:hover {
+    background-color: rgb(237, 237, 237);
+}
+tr > th {
+    background-color: #4d4d4d;
+    color: white;
+}
+th, td {
+    padding: 2px 12px;
+    white-space: nowrap;
+}
+
+td.name {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+td.sum {
+    text-align: right;
+}
