@@ -28,7 +28,7 @@ footer {
 
 span.unknown, span.available, span.occupied, span.error {
     border-radius: 2px;
-    padding: 4px 4px 2px 3px;
+    padding: 5px 4px 1px 3px;
     color: white;
     min-width: 16px;
     display: inline-block;
