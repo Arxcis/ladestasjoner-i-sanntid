@@ -28,7 +28,7 @@ footer {
 
 span.unknown, span.available, span.occupied, span.error {
     border-radius: 2px;
-    padding: 5px 5px 2px 5px;
+    padding: 4px 4px 2px 3px;
     color: white;
     min-width: 16px;
     display: inline-block;
@@ -76,4 +76,8 @@ td.name {
 
 td.sum {
     text-align: right;
+}
+
+td.status {
+    font-size: 15px;
 }
