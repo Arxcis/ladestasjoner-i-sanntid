@@ -287,8 +287,6 @@ function render(table, chargerStations) {
     const occupiedPromille = Math.round((occupiedKW / installedKW) * 1000)
     const availablePromille = 1000 - occupiedPromille;
 
-     console.log({occupiedKW, availableKW, installedKW, occupiedPromille, availablePromille})
-
     // 3. Render
     table.innerHTML = `
         <thead>
@@ -305,8 +303,8 @@ function render(table, chargerStations) {
                 <td><b>${makeDatetimeString(Date.now())}</b></td>
                 <td class="sum"><b>${installedKW}</b></td>
                 <td class="status">
-                    <span class="occupied" style="width: ${occupiedPromille * .8}px;" title="${occupiedKW} kW occupied">${Math.round(occupiedKW / 100) / 10}k</span>
-                    <span class="available" style="width: ${availablePromille * .8}px;" title="${availableKW} kW available">${Math.round(availableKW / 100) / 10}k</span>
+                    <span class="occupied" style="width: ${occupiedPromille * .85}px;" title="${occupiedKW} kW occupied">${Math.round(occupiedKW / 100) / 10}k</span>
+                    <span class="available" style="width: ${availablePromille * .85}px;" title="${availableKW} kW available">${Math.round(availableKW / 100) / 10}k</span>
                 </td>
             </tr>
             <tr>
