@@ -283,7 +283,12 @@ function render(table, chargerStations) {
                 return a.name.localeCompare(b.name);
             }
         });
-    
+    const installedKW = occupiedKW + availableKW;
+    const occupiedPromille = Math.round((occupiedKW / installedKW) * 1000)
+    const availablePromille = 1000 - occupiedPromille;
+
+     console.log({occupiedKW, availableKW, installedKW, occupiedPromille, availablePromille})
+
     // 3. Render
     table.innerHTML = `
         <thead>
@@ -298,8 +303,11 @@ function render(table, chargerStations) {
             <tr>
                 <td><b>Norge</b></td>
                 <td><b>${makeDatetimeString(Date.now())}</b></td>
-                <td class="sum"><b>${occupiedKW + availableKW}</b></td>
-                <td>${makeStatusSpan(1, occupiedKW)} ${makeStatusSpan(0, availableKW)}</td>
+                <td class="sum"><b>${installedKW}</b></td>
+                <td>
+                    <span class="occupied" style="width: ${occupiedPromille * 1.2}px;" title="${occupiedKW} kW occupied">${occupiedKW}</span>
+                    <span class="available" style="width: ${availablePromille * 1.2}px;" title="${availableKW} kW available">${availableKW}</span>
+                </td>
             </tr>
             <tr>
                 ${chargerStations.map(({uuid, connectors, x, y, name }) => {
