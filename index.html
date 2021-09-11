@@ -87,7 +87,7 @@
     </style>
 </head>
 <body>
-    <header><h2>Norske ladestasjoner i sanntid 🔌</h2></header>
+    <header><h2>CSS ladestasjoner i sanntid 🔌</h2></header>
     <table>
     </table>
     <footer>
@@ -97,60 +97,79 @@
     </footer>
 </body>
 <script>
-    const HOST = "boiling-cliffs-78163.herokuapp.com";
-    const HTTP_HOST = `https://${HOST}`;
-    const WS_HOST = `wss://${HOST}`;
 
-    // Create WebSocket connection.
-    const socket = new WebSocket(WS_HOST);
-    socket.addEventListener('open', (event) => {
-        socket.send('Hello Server!');
-    });
-    socket.addEventListener('message', OnMessage);
+const HOST = "boiling-cliffs-78163.herokuapp.com";
+const HTTP_HOST = `https://${HOST}`;
+const WS_HOST = `wss://${HOST}`;
 
-    // Listen for messages
-    const chargerStationsMap = new Map();
+// Create WebSocket connection.
+const socket = new WebSocket(WS_HOST);
+socket.addEventListener('open', (event) => {
+    socket.send('Hello Server!');
+});
+socket.addEventListener('message', OnMessage);
 
-    async function OnMessage(event) {
-        const message = JSON.parse(event.data);
+// Listen for messages
+const chargerStationsMap = new Map();
 
-        async function update(dynamicChargerStation) {
-            // @bugfix - unix timestamp is not really a unix timestamp but a Europe/Oslo-timestamp disguised as unix timestamp 
-            dynamicChargerStation.connectors = dynamicChargerStation.connectors.map(({ uuid, status, timestamp }) => {
-                return {
-                    uuid,
-                    status,
-                    timestamp: timestamp - ((new Date()).getTimezoneOffset() * 60000)
-                }
-            }) 
-            // @bugfix end
-            const staticChargerStation = await getStaticChargerStation(dynamicChargerStation.uuid);
-            const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
-            chargerStationsMap.set(chargerStation.uuid, chargerStation)
-            render();
-        }
+async function OnMessage(event) {
+    const message = JSON.parse(event.data);
 
-        switch (message?.type) { 
-            case  "status:update": {
-                const { type, data: station } = message
-                if (station.uuid.includes("NOR_")) {
-                    await update(station)
-                }
-            } break;
-            case "snapshot:init": {
-                const { type, data: chargerStations } = message;
-
-                const norwegianChargerStations = chargerStations.filter(({uuid}) => uuid.includes("NOR_"))
-
-                for (const station of norwegianChargerStations) {
-                    await update(station)
-                }
-            } break;
-            default: {
-                console.error(`unknown message?.type: "`, {event, message})
+    switch (message?.type) { 
+        case  "status:update": {
+            const { type, data: station } = message
+            if (station.uuid.includes("NOR_")) {
+                await update(station)
             }
+        } break;
+        case "snapshot:init": {
+            const { type, data: chargerStations } = message;
+
+            const norwegianChargerStations = chargerStations.filter(({uuid}) => uuid.includes("NOR_"))
+
+            for (const station of norwegianChargerStations) {
+                await update(station)
+            }
+        } break;
+        default: {
+            console.error(`unknown message?.type: "`, {event, message})
         }
     }
+}
+
+async function update(dynamicChargerStation) {
+    // 1. @bugfix - unix timestamp is not really a unix timestamp but a Europe/Oslo-timestamp disguised as unix timestamp 
+    dynamicChargerStation.connectors = dynamicChargerStation.connectors.map(({ uuid, status, timestamp }) => {
+        return {
+            uuid,
+            status,
+            timestamp: timestamp - ((new Date()).getTimezoneOffset() * 60000)
+        }
+    })
+    // @bugfix end
+
+    // 2. Get static data about station
+    let staticChargerStation = getChargerStationLocalStorage(dynamicChargerStation.uuid);
+    if (!staticChargerStation) {
+        staticChargerStation = await fetchCSSChargerStation(dynamicChargerStation.uuid);
+        setChargerStationLocalStorage(staticChargerStation.uuid, staticChargerStation);
+    }
+
+    // 3. If no CSS plugs found
+    if (staticChargerStation.connectors.length === 0) {
+        return;
+    }
+
+    // 4. Merge static and dynamic
+    const chargerStation = mergeStaticAndDynamicChargerStation(staticChargerStation, dynamicChargerStation);
+
+    // 5. Set and render
+    chargerStationsMap.set(chargerStation.uuid, chargerStation)
+    const chargerStations = [...chargerStationsMap.values()];
+    const table = document.querySelector("table");
+
+    render(table, chargerStations);
+}
 
 function mergeStaticAndDynamicChargerStation(static, dynamic) {
     const merged = {
@@ -160,6 +179,7 @@ function mergeStaticAndDynamicChargerStation(static, dynamic) {
             if (!dynamicConnector) {
                 console.error("mergeStaticAndDynamicChargerStation: !dynamicConnector:", dynamicConnector?.uuid, staticConnector.uuid, { static, dynamic })
             }
+
             return {
                 ...staticConnector,
                 ...dynamicConnector ?? {},
@@ -170,12 +190,7 @@ function mergeStaticAndDynamicChargerStation(static, dynamic) {
     return merged;
 }
 
-
-
-/**
- * Get static data about chargerstation
-*/ 
-async function getStaticChargerStation(uuid) {
+function getChargerStationLocalStorage(uuid) {
     let item;
     try {
         item = JSON.parse(window.localStorage.getItem(uuid))
@@ -185,7 +200,17 @@ async function getStaticChargerStation(uuid) {
         }
     } catch(err) {
     }
+    return null;
+}
 
+function setChargerStationLocalStorage(uuid, station) {
+    window.localStorage.setItem(uuid, JSON.stringify(station))
+}
+
+/**
+ * Get static data about chargerstation
+*/ 
+async function fetchCSSChargerStation(uuid) {
     const res = await fetch(`${HTTP_HOST}/charger-station/${uuid}`);
     const json = await res.json();
     
@@ -204,16 +229,19 @@ async function getStaticChargerStation(uuid) {
         .map(([index, attributes]) => {
             const attrCapacity = attributes.find(({attrname}) => attrname === "Charging capacity")?.attrvalid ?? "0";
             const attrTimestamp = attributes.find(({attrname}) => attrname === "timestamp")?.attrval ?? -1;
+            const attrConnector = attributes.find(({attrname}) => attrname === "Connector")?.attrvalid ?? "other";
 
             return {
                 uuid: `${uuid}_${index.padStart(2, '0')}`,
                 power: mapCapacityIdToKiloWatt(parseInt(attrCapacity)),
-                timestamp: (new Date(attrTimestamp)).getTime()
+                timestamp: (new Date(attrTimestamp)).getTime(),
+                isCSS: attrConnector === "39"
             };
-        }).sort((a,b) => b.power - a.power);
+        })
+        .sort((a,b) => b.power - a.power)
+        .filter(({isCSS}) => isCSS)
 
     const newChargerStation = { uuid, name, x, y, connectors };
-    window.localStorage.setItem(uuid, JSON.stringify(newChargerStation))
 
     return newChargerStation;
 }
@@ -272,14 +300,12 @@ function mapCapacityIdToKiloWatt(capacityId) {
         case 31: return 250;
         case 33: return 300;
         case 25: return 350;
-        default: return 0;
+        case 19: return 20;
+        default: return capacityId;
     }
 }
 
-function render() {
-    const table = document.querySelector("table");
-    const chargerStations = [...chargerStationsMap.values()]
-    
+function render(table, chargerStations) {
 
     function sumAvailablePower(connectors) {
         return connectors?.reduce((sum, connector) => sum + (connector.power * (connector.status !== 1)), 0) ?? 0;
@@ -288,7 +314,25 @@ function render() {
         return connectors?.reduce((sum, connector) => sum + (connector.power * (connector.status === 1)), 0) ?? 0;
     }
 
-    const sortedChargerStations = chargerStations
+    // 1. Update kw occupied vs kw available
+    const occupiedKW = chargerStations
+        .reduce(
+            (sum, station) => sum + station.connectors.reduce(
+                (sum, connector) => sum + connector.power * (connector.status === 1), 
+            0), 
+        0);
+    
+    const availableKW = chargerStations
+        .reduce(
+            (sum, station) => sum + station.connectors.reduce(
+                (sum, connector) => sum + connector.power * (connector.status !== 1), 
+            0), 
+        0);
+
+    const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)));
+
+    // 2. Sort
+    chargerStations
         .sort((a, b) => {
             const occub = sumOccupiedPower(b.connectors)
             const occua = sumOccupiedPower(a.connectors);
@@ -304,25 +348,8 @@ function render() {
                 return a.name.localeCompare(b.name);
             }
         });
-
-    // Update kw occupied vs kw available
-    const values = [...chargerStationsMap.values()];
-    const occupiedKW = values
-        .reduce(
-            (sum, station) => sum + station.connectors.reduce(
-                (sum, connector) => sum + connector.power * (connector.status === 1), 
-            0), 
-        0);
     
-    const availableKW = values
-        .reduce(
-            (sum, station) => sum + station.connectors.reduce(
-                (sum, connector) => sum + connector.power * (connector.status !== 1), 
-            0), 
-        0);
-
-    const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)));
-
+    // 3. Render
     table.innerHTML = `
         <thead>
             <tr>
@@ -330,7 +357,7 @@ function render() {
                 <th>charger station name</th>
                 <th>last update</th>
                 <th>load %</th>
-                <th>occupied kW / available kW</th>
+                <th>installed kW</th>
             </tr>
         </thead>
         <tbody>
@@ -342,7 +369,7 @@ function render() {
                 <td>${makeStatusSpan(1, occupiedKW)} ${makeStatusSpan(0, availableKW)}</td>
             </tr>
             <tr>
-                ${sortedChargerStations.map(({uuid, connectors, x, y, name }) => {
+                ${chargerStations.map(({uuid, connectors, x, y, name }) => {
                     const occupiedKW = sumOccupiedPower(connectors);
                     const availableKW = sumAvailablePower(connectors);
                     const loadPercent = Math.round(100 * (occupiedKW / (occupiedKW + availableKW)))
